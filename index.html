@@ -1,998 +1,355 @@
-```html
 <!DOCTYPE html>
-<html lang="he" dir="rtl" class="dark">
+<html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>סימולטור אריה בסוואנה - ספארי אינטראקטיבי</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <style>
-        /* התאמות מיוחדות למסך ה-Samsung S25 Ultra ולמניעת גלילה לא רצויה */
-        body {
-            touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-top: env(safe-area-inset-top);
-        }
-        /* אפקטי זכוכית מעוצבים ותגים שקופים */
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .glass-badge {
-            background: rgba(15, 23, 42, 0.55);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>סימולטור אריה בסוואנה</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #020617; color: #f8fafc; touch-action: manipulation; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .glass { background: rgba(15, 23, 42, .78); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(12px); }
+    .btn { border-radius: .75rem; padding: .55rem .7rem; background: #1e293b; border: 1px solid #334155; transition: .15s; }
+    .btn:active { transform: scale(.96); }
+    .btn.active { background: #f59e0b; color: #020617; border-color: #fbbf24; font-weight: 900; }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-500 overflow-x-hidden">
+<body class="min-h-screen flex flex-col">
+  <header class="w-full max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-black text-amber-400">Savanna Pro Simulator</h1>
+      <p class="text-xs text-slate-400">סימולטור אריה אינטראקטיבי • Canvas + Web Audio</p>
+    </div>
+    <button id="audioToggleBtn" class="btn text-sm flex items-center gap-2"><span id="audioIcon">🔈</span><span>סאונד</span></button>
+  </header>
 
-    <!-- סרגל כותרת עליון -->
-    <header class="w-full max-w-5xl mx-auto px-4 pt-4 pb-2 flex justify-between items-center z-25">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 animate-pulse">
-                <!-- אייקון אריה סכמטי ב-SVG -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z"/>
-                    <path d="M12 6a4 4 0 0 0-4 4c0 3 4 8 4 8s4-5 4-4a4 4 0 0 0-4-4z"/>
-                    <path d="M12 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Savanna Pro Simulator</h1>
-                <p class="text-[10px] text-slate-400 font-mono tracking-wider">סביבת הדמיה אפריקאית • מודל פרוצדורלי מלא</p>
-            </div>
+  <main class="w-full max-w-5xl mx-auto px-3 flex-1 flex flex-col gap-3">
+    <section class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl h-[390px] sm:h-[520px] bg-slate-900">
+      <canvas id="simulationCanvas"></canvas>
+      <div class="absolute top-3 left-3 right-3 flex flex-wrap gap-2 justify-between pointer-events-none text-[11px]">
+        <div class="glass rounded-xl px-3 py-2">⚡ מהירות: <b id="hudSpeed" class="text-amber-300">1.0x</b></div>
+        <div class="glass rounded-xl px-3 py-2">🏁 מרחק: <b id="hudDistance" class="text-amber-300">0 מ'</b></div>
+        <div class="glass rounded-xl px-3 py-2">🕒 זמן: <b id="hudTime" class="text-orange-300">צהריים ☀️</b></div>
+        <div class="glass rounded-xl px-3 py-2">🌤️ מזג אוויר: <b id="hudWeather" class="text-sky-300">בהיר ☀️</b></div>
+      </div>
+      <div id="canvasNotification" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-400 text-slate-950 font-black text-3xl px-7 py-4 rounded-full opacity-0 scale-75 transition-all pointer-events-none shadow-2xl">שאגה! 🦁</div>
+    </section>
+
+    <section class="glass rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+      <div>
+        <div class="flex justify-between mb-2"><b>קצב התקדמות האריה</b><span id="speedValLabel" class="text-amber-300 font-bold">הליכה רגילה</span></div>
+        <input id="speedSlider" type="range" min="0" max="3" step="0.1" value="1" class="w-full accent-amber-500" />
+      </div>
+      <div>
+        <b class="block mb-2">שעת היום</b>
+        <div class="grid grid-cols-4 gap-2">
+          <button class="btn time-btn" data-time="morning">🌅 בוקר</button>
+          <button class="btn time-btn active" data-time="noon">☀️ צהריים</button>
+          <button class="btn time-btn" data-time="sunset">🌇 שקיעה</button>
+          <button class="btn time-btn" data-time="night">🌃 לילה</button>
         </div>
-
-        <!-- כפתורי הגדרות מהירות בסרגל העליון -->
-        <div class="flex gap-2">
-            <button id="audioToggleBtn" class="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 hover:bg-slate-700 active:scale-95 transition-all text-xs flex items-center gap-1 cursor-pointer">
-                <span id="audioIcon">🔈</span> <span class="hidden sm:inline">סאונד סביבתי</span>
-            </button>
-            <button id="themeToggle" class="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 hover:bg-slate-700 active:scale-95 transition-all text-xs cursor-pointer">
-                🌓
-            </button>
+      </div>
+      <div>
+        <b class="block mb-2">פעולות</b>
+        <div class="grid grid-cols-3 gap-2">
+          <button id="roarBtn" class="btn bg-orange-600 border-orange-500 font-black">🦁 שאגה</button>
+          <button id="weatherToggleBtn" class="btn">🌧️ גשם</button>
+          <button id="spawnGazelleBtn" class="btn">🦌 הוסף איילה</button>
         </div>
-    </header>
-
-    <!-- אזור הקנבס והסימולציה הראשי -->
-    <main class="flex-grow flex flex-col items-center justify-center p-2 sm:p-4 w-full max-w-5xl mx-auto gap-3 relative">
-        <!-- קופסת הקנבס - מותאמת לגובה מרווח שמונע הסתרת האריה -->
-        <div class="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80 bg-slate-900 h-[360px] xs:h-[390px] sm:h-[460px]">
-            <!-- קנבס הסימולציה המרכזי -->
-            <canvas id="simulationCanvas" class="w-full h-full block"></canvas>
-
-            <!-- תצוגת נתונים עילית משופרת ודקה (HUD בתגים שקופים) שלא חוסמת את האריה -->
-            <div id="hudPanel" class="absolute top-2.5 left-2.5 right-2.5 flex flex-wrap gap-1.5 justify-between items-center pointer-events-none z-10">
-                <!-- נתוני תנועה -->
-                <div class="flex gap-1.5 flex-wrap">
-                    <span class="glass-badge px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-medium flex items-center gap-1 shadow-sm">
-                        ⚡ מהירות: <span id="hudSpeed" class="text-amber-400 font-bold font-mono">1.0x</span>
-                    </span>
-                    <span class="glass-badge px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-medium flex items-center gap-1 shadow-sm">
-                        🏁 מרחק: <span id="hudDistance" class="text-amber-400 font-bold font-mono">0 מ'</span>
-                    </span>
-                </div>
-                <!-- נתוני סביבה -->
-                <div class="flex gap-1.5 flex-wrap">
-                    <span class="glass-badge px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-medium flex items-center gap-1 shadow-sm">
-                        🕒 זמן: <span id="hudTime" class="text-orange-400 font-bold">צהריים ☀️</span>
-                    </span>
-                    <span class="glass-badge px-2.5 py-1 rounded-lg text-[10px] text-slate-300 font-medium flex items-center gap-1 shadow-sm">
-                        🌤️ מזג אוויר: <span id="hudWeather" class="text-sky-400 font-bold">בהיר ☀️</span>
-                    </span>
-                </div>
-            </div>
-
-            <!-- התראות קנבס זמניות (למשל בעת שאגה) -->
-            <div id="canvasNotification" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500/95 text-slate-950 font-black text-2xl px-6 py-3 rounded-full opacity-0 scale-75 transition-all duration-300 pointer-events-none tracking-widest uppercase shadow-2xl shadow-amber-500/50 z-30">
-                שאגה! 🦁
-            </div>
-        </div>
-
-        <!-- טיפ אינטראקטיבי - כעת ממוקם מחוץ לקנבס, מעוצב ולא מפריע כלל לאריה! -->
-        <div class="w-full py-2 px-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center text-xs text-amber-400 flex items-center justify-center gap-1.5 shadow-sm">
-            <span>💡</span>
-            <span><strong>ספארי אינטראקטיבי:</strong> לחץ על האריה עצמו בתוך הקנבס, או הקש על כפתור השאגה כדי לשמוע את קולו!</span>
-        </div>
-    </main>
-
-    <!-- פאנל בקרה אינטראקטיבי תחתון -->
-    <footer class="w-full max-w-5xl mx-auto px-2 sm:px-4 pb-4 space-y-3 z-20">
-        <!-- פקדים ראשיים -->
-        <div class="glass-panel rounded-2xl p-4 md:p-5 space-y-4">
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                
-                <!-- בקרה 1: מהירות האריה -->
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="font-bold text-slate-300">קצב התקדמות האריה</span>
-                        <span id="speedValLabel" class="bg-amber-500/10 text-amber-400 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/20 font-mono text-[11px]">הליכה רגילה</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm">🐾</span>
-                        <input type="range" id="speedSlider" min="0" max="3" step="0.1" value="1" 
-                               class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50">
-                        <span class="text-sm">⚡</span>
-                    </div>
-                </div>
-
-                <!-- בקרה 2: שעת היום בספארי (כעת נשלט ישירות דרך אירועי JS תקינים) -->
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-slate-300 block">שעת היום בסוואנה</label>
-                    <div class="grid grid-cols-4 gap-1.5">
-                        <button id="timeBtn_morning" data-time="morning" class="time-btn py-1.5 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 font-medium border border-slate-700/60 transition-all active:scale-95 cursor-pointer">🌅 בוקר</button>
-                        <button id="timeBtn_noon" data-time="noon" class="time-btn py-1.5 text-[11px] rounded-lg bg-amber-500 text-slate-950 font-bold border border-amber-400 transition-all active:scale-95 cursor-pointer">☀️ צהריים</button>
-                        <button id="timeBtn_sunset" data-time="sunset" class="time-btn py-1.5 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 font-medium border border-slate-700/60 transition-all active:scale-95 cursor-pointer">🌇 שקיעה</button>
-                        <button id="timeBtn_night" data-time="night" class="time-btn py-1.5 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 font-medium border border-slate-700/60 transition-all active:scale-95 cursor-pointer">🌃 לילה</button>
-                    </div>
-                </div>
-
-                <!-- בקרה 3: כפתורי פעולה מיוחדים (כולם עובדים באופן מלא!) -->
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-slate-300 block">פעולות ומזג אוויר</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <!-- כפתור שאגה דינמי שמפעיל סאונד ורעידת מסך -->
-                        <button id="roarBtn" class="py-1.5 text-[11px] font-black rounded-lg bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer">
-                            🦁 שאגה!
-                        </button>
-                        <button id="weatherToggleBtn" class="py-1.5 text-[11px] font-medium rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 active:scale-95 transition-all cursor-pointer">
-                            🌧️ גשם/סערה
-                        </button>
-                        <button id="spawnGazelleBtn" class="py-1.5 text-[11px] font-medium rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/60 active:scale-95 transition-all cursor-pointer">
-                            🦌 זמן צבי
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- פאנל מידע אקולוגי מרתק על האריה האפריקאי -->
-        <div class="glass-panel rounded-2xl p-4 space-y-3 text-xs leading-relaxed text-slate-300 border-l-4 border-l-amber-500">
-            <h3 class="text-sm font-bold text-amber-400 flex items-center gap-1.5">
-                📖 מידע ספארי: האריה האפריקאי (Panthera leo)
-            </h3>
-            <p>
-                האריה הוא טורף העל המפורסם ביותר של יבשת אפריקה. בניגוד לרוב החתוליים, האריות הם חיות חברתיות ביותר החיות בלהקות המונות בדרך כלל נקבות קרובות משפחה, גוריהן, ומספר זכרים שליטים. הרעמה המפוארת של הזכר (הנראית בסימולטור) משמשת בעיקר להרתעת יריבים ולהגנה על הצוואר במהלך קרבות טריטוריאליים. עוצמת השאגה של אריה בוגר יכולה להגיע ל-114 דציבלים ולהישמע למרחק של עד 8 קילומטרים!
-            </p>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[10px] text-slate-400 font-semibold">
-                <div>• מהירות מרבית: עד 80 קמ"ש</div>
-                <div>• משקל זכר בוגר: 150-250 ק"ג</div>
-                <div>• תוחלת חיים בטבע: 10-14 שנים</div>
-                <div>• סטטוס שימור: פגיע (Vulnerable)</div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- לוגיקת הסימולציה המלאה -->
-    <script>
-        // אתחול הקנבס והקשר
-        const canvas = document.getElementById('simulationCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        // הגדרת משתני רזולוציה לצפיפות מסך גבוהה (Samsung Ultra AMOLED)
-        let pixelRatio = window.devicePixelRatio || 1;
-        let w = 0;
-        let h = 0;
-
-        // מערכי משאבים דינמיים שיתעדכנו ב-resize
-        const rainDrops = [];
-        const stars = [];
-
-        function resizeCanvas() {
-            const rect = canvas.getBoundingClientRect();
-            w = rect.width;
-            h = rect.height;
-            canvas.width = w * pixelRatio;
-            canvas.height = h * pixelRatio;
-            ctx.scale(pixelRatio, pixelRatio);
-
-            // אתחול מחדש של הגשם לפי גודל קנבס עדכני כדי שלא יתעוות
-            rainDrops.length = 0;
-            for (let i = 0; i < 70; i++) {
-                rainDrops.push({
-                    x: Math.random() * w,
-                    y: Math.random() * h,
-                    length: 10 + Math.random() * 12,
-                    speed: 6 + Math.random() * 5
-                });
-            }
-
-            // אתחול כוכבי לילה ברקע
-            stars.length = 0;
-            for (let i = 0; i < 40; i++) {
-                stars.push({
-                    x: Math.random() * w,
-                    y: Math.random() * (h * 0.5),
-                    size: 0.5 + Math.random() * 1.5,
-                    alpha: 0.2 + Math.random() * 0.8,
-                    speed: 0.01 + Math.random() * 0.02
-                });
-            }
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        // משתני שליטה במצב המשחק והסביבה
-        let isDarkMode = false;
-        let speedMultiplier = 1;
-        let currentDistance = 0;
-        let globalOffset = 0;
-        let animationTime = 0;
-        
-        let currentTimeOfDay = 'noon'; // morning, noon, sunset, night
-        let isRainy = false;
-        let audioEnabled = false;
-
-        // אפקט ברקים ורעמים בזמן סערה
-        let lightningFlash = 0;
-
-        // מערכת סאונד דיגיטלית - Web Audio API (ללא צורך בקבצים חיצוניים!)
-        let audioCtx = null;
-        let ambientWind = null;
-
-        function initAudio() {
-            if (audioCtx) return;
-            try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                startAmbientSound();
-            } catch (e) {
-                console.error("שגיאה באתחול השמע:", e);
-            }
-        }
-
-        // סינתזת סאונד סביבתי (רעש רוח וסערה)
-        function startAmbientSound() {
-            if (!audioCtx || !audioEnabled) return;
-
-            // יצירת חוצץ רעש לבן מסונתז לרוח
-            const bufferSize = audioCtx.sampleRate * 2;
-            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1;
-            }
-
-            const whiteNoise = audioCtx.createBufferSource();
-            whiteNoise.buffer = noiseBuffer;
-            whiteNoise.loop = true;
-
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(250, audioCtx.currentTime);
-            filter.Q.setValueAtTime(3, audioCtx.currentTime);
-
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(isRainy ? 0.15 : 0.06, audioCtx.currentTime);
-
-            whiteNoise.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            whiteNoise.start();
-
-            ambientWind = { source: whiteNoise, filter: filter, gain: gainNode };
-
-            // אפקט שינוי עוצמת רוח דינמי
-            setInterval(() => {
-                if (ambientWind && audioEnabled) {
-                    let baseFreq = isRainy ? 350 : 180;
-                    let targetFreq = baseFreq + Math.random() * 250;
-                    let targetGain = isRainy ? 0.10 + Math.random() * 0.10 : 0.03 + Math.random() * 0.06;
-                    ambientWind.filter.frequency.exponentialRampToValueAtTime(targetFreq, audioCtx.currentTime + 1.5);
-                    ambientWind.gain.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + 1.5);
-                }
-            }, 2000);
-        }
-
-        function stopAmbientSound() {
-            if (ambientWind && ambientWind.source) {
-                try { ambientWind.source.stop(); } catch(e){}
-                ambientWind = null;
-            }
-        }
-
-        // סינתזת שאגת אריה ריאליסטית (שילוב תדרים נמוכים מאוד וחספוס)
-        function playLionRoarSound() {
-            if (!audioCtx || !audioEnabled) return;
-
-            const now = audioCtx.currentTime;
-
-            const osc = audioCtx.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(58, now);
-            osc.frequency.exponentialRampToValueAtTime(32, now + 1.3);
-
-            const osc2 = audioCtx.createOscillator();
-            osc2.type = 'square';
-            osc2.frequency.setValueAtTime(115, now);
-            osc2.frequency.linearRampToValueAtTime(42, now + 0.9);
-
-            const lowpass = audioCtx.createBiquadFilter();
-            lowpass.type = 'bandpass';
-            lowpass.frequency.setValueAtTime(140, now);
-            lowpass.Q.setValueAtTime(1.8, now);
-
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0.01, now);
-            gainNode.gain.linearRampToValueAtTime(0.45, now + 0.18);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.9);
-
-            osc.connect(lowpass);
-            osc2.connect(lowpass);
-            lowpass.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            osc.start(now);
-            osc2.start(now);
-            osc.stop(now + 2.1);
-            osc2.stop(now + 2.1);
-        }
-
-        // סינתזת רעם עמוק לסופת הברקים
-        function playThunderSound() {
-            if (!audioCtx || !audioEnabled) return;
-
-            const now = audioCtx.currentTime;
-            
-            // תדרים נמוכים ועמוקים במיוחד
-            const osc = audioCtx.createOscillator();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(45, now);
-            osc.frequency.linearRampToValueAtTime(15, now + 2.5);
-
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(100, now);
-
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0.8, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 3.0);
-
-            osc.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            osc.start(now);
-            osc.stop(now + 3.2);
-        }
-
-        // ניהול כפתור שמע ראשי
-        const audioToggleBtn = document.getElementById('audioToggleBtn');
-        const audioIcon = document.getElementById('audioIcon');
-        
-        audioToggleBtn.addEventListener('click', () => {
-            audioEnabled = !audioEnabled;
-            if (audioEnabled) {
-                audioIcon.innerText = "🔊";
-                audioToggleBtn.classList.remove('bg-slate-800/80');
-                audioToggleBtn.classList.add('bg-amber-500', 'text-slate-950', 'border-amber-400');
-                if (!audioCtx) {
-                    initAudio();
-                } else {
-                    if (audioCtx.state === 'suspended') {
-                        audioCtx.resume();
-                    }
-                    startAmbientSound();
-                }
-            } else {
-                audioIcon.innerText = "🔈";
-                audioToggleBtn.add('bg-slate-800/80');
-                audioToggleBtn.classList.remove('bg-amber-500', 'text-slate-950', 'border-amber-400');
-                stopAmbientSound();
-            }
-        });
-
-        // ניהול כפתור ערכת נושא מהיר
-        const themeToggle = document.getElementById('themeToggle');
-        themeToggle.addEventListener('click', () => {
-            isDarkMode = !isDarkMode;
-            document.documentElement.classList.toggle('dark', isDarkMode);
-            setTimeOfDay(isDarkMode ? 'night' : 'noon');
-        });
-
-        // מערך עצים דינמי
-        const trees = [
-            { x: 100, yFactor: 0.68, scale: 0.95 },
-            { x: 450, yFactor: 0.70, scale: 0.80 },
-            { x: 800, yFactor: 0.67, scale: 1.15 },
-            { x: 1200, yFactor: 0.69, scale: 0.90 }
-        ];
-
-        // מערך עננים בשמיים
-        const clouds = [
-            { x: 50, y: 40, size: 30, speed: 0.15 },
-            { x: 300, y: 70, size: 50, speed: 0.10 },
-            { x: 650, y: 30, size: 40, speed: 0.20 },
-            { x: 900, y: 80, size: 35, speed: 0.08 }
-        ];
-
-        // מערך חלקיקי גחליליות (למצב לילה)
-        const fireflies = [];
-        for (let i = 0; i < 20; i++) {
-            fireflies.push({
-                x: Math.random() * 1000,
-                y: 100 + Math.random() * 200,
-                angle: Math.random() * Math.PI * 2,
-                speed: 0.4 + Math.random() * 0.5,
-                pulse: Math.random()
-            });
-        }
-
-        // מערכת צבאים / גאזלים דינמיים ברקע
-        const gazelles = [];
-        function spawnGazelle() {
-            gazelles.push({
-                x: w + 50,
-                y: h * 0.69 + (Math.random() * 10 - 5),
-                frame: 0,
-                speed: 3 + Math.random() * 2
-            });
-        }
-
-        // קישור כפתור צבי ישירות מתוך ה-JS
-        document.getElementById('spawnGazelleBtn').addEventListener('click', spawnGazelle);
-
-        // מערכת להקות ציפורים בשמיים
-        const birds = [];
-        for(let i=0; i<6; i++) {
-            birds.push({
-                x: Math.random() * 600 + 400,
-                y: 50 + Math.random() * 80,
-                phase: Math.random() * Math.PI,
-                speed: 1 + Math.random() * 0.5
-            });
-        }
-
-        // ניהול שליטה על מהירות האריה
-        const speedSlider = document.getElementById('speedSlider');
-        const speedValLabel = document.getElementById('speedValLabel');
-        const hudSpeed = document.getElementById('hudSpeed');
-        const hudDistance = document.getElementById('hudDistance');
-
-        speedSlider.addEventListener('input', (e) => {
-            speedMultiplier = parseFloat(e.target.value);
-            hudSpeed.innerText = speedMultiplier.toFixed(1) + 'x';
-            
-            if (speedMultiplier === 0) {
-                speedValLabel.innerText = "אריה במנוחה";
-            } else if (speedMultiplier < 0.8) {
-                speedValLabel.innerText = "זחילה איטית";
-            } else if (speedMultiplier >= 0.8 && speedMultiplier <= 1.2) {
-                speedValLabel.innerText = "הליכה רגילה";
-            } else if (speedMultiplier > 1.2 && speedMultiplier <= 2.2) {
-                speedValLabel.innerText = "ריצה קלה";
-            } else {
-                speedValLabel.innerText = "מרדף סערה!";
-            }
-        });
-
-        // פלטת צבעי סוואנה לכל שעה ביממה
-        const skyColors = {
-            morning: { skyTop: '#2e1065', skyBottom: '#fdba74', sunColor: '#ffedd5', sunRadius: 28, groundFar: '#854d0e', groundNear: '#a16207' },
-            noon: { skyTop: '#38bdf8', skyBottom: '#fef08a', sunColor: '#facc15', sunRadius: 25, groundFar: '#ca8a04', groundNear: '#eab308' },
-            sunset: { skyTop: '#7c2d12', skyBottom: '#f97316', sunColor: '#fde047', sunRadius: 32, groundFar: '#7c2d12', groundNear: '#9a3412' },
-            night: { skyTop: '#030712', skyBottom: '#0f172a', sunColor: '#f1f5f9', sunRadius: 18, groundFar: '#1e1b4b', groundNear: '#171717' }
-        };
-
-        const hudTime = document.getElementById('hudTime');
-
-        // פונקציית עדכון שעת יום מסודרת
-        function setTimeOfDay(time) {
-            currentTimeOfDay = time;
-            
-            // עדכון ויזואלי של הכפתורים הפעילים בממשק
-            document.querySelectorAll('.time-btn').forEach(btn => {
-                const btnTime = btn.getAttribute('data-time');
-                if (btnTime === time) {
-                    btn.className = "time-btn py-1.5 text-[11px] rounded-lg bg-amber-500 text-slate-950 font-bold border border-amber-400 transition-all active:scale-95 cursor-pointer";
-                } else {
-                    btn.className = "time-btn py-1.5 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 font-medium border border-slate-700/60 transition-all active:scale-95 cursor-pointer";
-                }
-            });
-
-            isDarkMode = (time === 'night' || time === 'sunset');
-            document.documentElement.classList.toggle('dark', isDarkMode);
-
-            const translations = { morning: 'בוקר סוואנה 🌅', noon: 'צהריים בהירים ☀️', sunset: 'שקיעה אדומה 🌇', night: 'לילה אפריקאי 🌃' };
-            hudTime.innerText = translations[time];
-        }
-
-        // האזנה לאירועים של כפתורי זמן היום (מניעת באגים של Scope)
-        document.querySelectorAll('.time-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const selectedTime = e.currentTarget.getAttribute('data-time');
-                setTimeOfDay(selectedTime);
-            });
-        });
-
-        // שליטה על גשם/סערה
-        const weatherToggleBtn = document.getElementById('weatherToggleBtn');
-        const hudWeather = document.getElementById('hudWeather');
-
-        weatherToggleBtn.addEventListener('click', () => {
-            isRainy = !isRainy;
-            if (isRainy) {
-                weatherToggleBtn.classList.remove('bg-slate-800');
-                weatherToggleBtn.classList.add('bg-sky-500', 'text-slate-950', 'border-sky-400', 'font-bold');
-                hudWeather.innerText = "סופת גשם 🌧️";
-                if (ambientWind && audioEnabled) {
-                    ambientWind.gain.gain.linearRampToValueAtTime(0.20, audioCtx.currentTime + 1.0);
-                }
-            } else {
-                weatherToggleBtn.classList.add('bg-slate-800');
-                weatherToggleBtn.classList.remove('bg-sky-500', 'text-slate-950', 'border-sky-400', 'font-bold');
-                hudWeather.innerText = "בהיר ☀️";
-                if (ambientWind && audioEnabled) {
-                    ambientWind.gain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 1.0);
-                }
-            }
-        });
-
-        // ----------------- מנוע הציור והאנימציה -----------------
-
-        // פונקציית ציור עץ אקציה פראי
-        function drawSafariAcacia(x, y, scale) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.scale(scale, scale);
-
-            // גזע פתלתל ועבה בבסיס
-            ctx.fillStyle = isDarkMode ? '#1e110a' : '#3c2211';
-            ctx.beginPath();
-            ctx.moveTo(-8, 0);
-            ctx.quadraticCurveTo(-6, -25, -20, -45);
-            ctx.quadraticCurveTo(-35, -55, -45, -60);
-            ctx.lineTo(-35, -60);
-            ctx.quadraticCurveTo(-25, -52, -12, -40);
-            ctx.quadraticCurveTo(5, -25, 6, 0);
-            ctx.closePath();
-            ctx.fill();
-
-            // ענף משני ימני
-            ctx.beginPath();
-            ctx.moveTo(-10, -25);
-            ctx.quadraticCurveTo(15, -35, 30, -55);
-            ctx.lineTo(40, -55);
-            ctx.quadraticCurveTo(20, -40, -5, -30);
-            ctx.closePath();
-            ctx.fill();
-
-            // ענף משני שמאלי גבוה
-            ctx.beginPath();
-            ctx.moveTo(-20, -45);
-            ctx.quadraticCurveTo(-15, -65, -5, -80);
-            ctx.lineTo(5, -80);
-            ctx.quadraticCurveTo(-5, -65, -12, -47);
-            ctx.closePath();
-            ctx.fill();
-
-            // צמרות שטוחות אופייניות לסוואנה (אפקט קומות של עלים)
-            ctx.fillStyle = isDarkMode ? '#0d2818' : '#1e4620';
-            
-            // צמרת שמאלית נמוכה
-            ctx.beginPath();
-            ctx.ellipse(-40, -60, 35, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // צמרת מרכזית גבוהה
-            ctx.beginPath();
-            ctx.ellipse(0, -80, 45, 9, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // צמרת ימנית
-            ctx.beginPath();
-            ctx.ellipse(35, -55, 38, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.restore();
-        }
-
-        // אפקט רעידת מסך זמני
-        let screenShake = 0;
-
-        // הפעלת שאגה
-        const roarBtn = document.getElementById('roarBtn');
-        const canvasNotification = document.getElementById('canvasNotification');
-
-        function triggerRoar() {
-            screenShake = 15;
-            canvasNotification.style.opacity = '1';
-            canvasNotification.style.transform = 'translate(-50%, -50%) scale(1.1)';
-            
-            // הפעלת סאונד במידה ומאושר
-            playLionRoarSound();
-
-            setTimeout(() => {
-                canvasNotification.style.opacity = '0';
-                canvasNotification.style.transform = 'translate(-50%, -50%) scale(0.75)';
-            }, 1200);
-        }
-
-        roarBtn.addEventListener('click', triggerRoar);
-
-        // תמיכה בהקשה ישירה על קנבס האנימציה (לשאגה אינטראקטיבית)
-        canvas.addEventListener('click', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top;
-            
-            const lionCenterX = w * 0.45;
-            const lionCenterY = h * 0.72;
-            const dist = Math.hypot(clickX - lionCenterX, clickY - lionCenterY);
-
-            // אם לחצו קרוב לאריה, תשמיע שאגה ותפעיל סאונד
-            if (dist < 100) {
-                if (!audioEnabled) {
-                    audioToggleBtn.click();
-                }
-                triggerRoar();
-            }
-        });
-
-        // ----------------- פונקציית הציור והאנימציה הראשית -----------------
-        function runSimulationLoop() {
-            // רעידת מסך דועכת
-            ctx.save();
-            if (screenShake > 0.1) {
-                let dx = (Math.random() - 0.5) * screenShake;
-                let dy = (Math.random() - 0.5) * screenShake;
-                ctx.translate(dx, dy);
-                screenShake *= 0.9;
-            }
-
-            // קריאת צבעי זמני היום שנבחרו
-            const colors = skyColors[currentTimeOfDay];
-
-            // 1. ציור שמיים עם גרדיאנט חלק
-            let skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-            skyGrad.addColorStop(0, colors.skyTop);
-            skyGrad.addColorStop(1, colors.skyBottom);
-            ctx.fillStyle = skyGrad;
-            ctx.fillRect(0, 0, w, h);
-
-            // אפקט כוכבים מנצנצים בלילה
-            if (currentTimeOfDay === 'night') {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                stars.forEach(star => {
-                    star.alpha += (Math.random() - 0.5) * 0.1;
-                    if (star.alpha < 0.1) star.alpha = 0.1;
-                    if (star.alpha > 1) star.alpha = 1;
-                    ctx.globalAlpha = star.alpha;
-                    ctx.beginPath();
-                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-                ctx.globalAlpha = 1.0;
-            }
-
-            // 2. ציור שמש/ירח מעוצב
-            ctx.fillStyle = colors.sunColor;
-            ctx.shadowColor = colors.sunColor;
-            ctx.shadowBlur = currentTimeOfDay === 'sunset' ? 40 : 15;
-            ctx.beginPath();
-            ctx.arc(w * 0.25, h * 0.3, colors.sunRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0; // ביטול אפקט הצל כדי לא לפגוע בביצועים
-
-            // ציור עננים נעים בשמיים
-            ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.45)';
-            clouds.forEach(cloud => {
-                cloud.x += cloud.speed * (1 + speedMultiplier * 0.2);
-                if (cloud.x > w + 100) cloud.x = -100;
-                
-                ctx.beginPath();
-                ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
-                ctx.arc(cloud.x + cloud.size*0.6, cloud.y - cloud.size*0.2, cloud.size * 0.8, 0, Math.PI * 2);
-                ctx.arc(cloud.x - cloud.size*0.5, cloud.y + cloud.size*0.1, cloud.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // ציור להקות ציפורים בשמיים
-            ctx.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(15, 23, 42, 0.4)';
-            ctx.lineWidth = 1.5;
-            birds.forEach(bird => {
-                bird.x -= bird.speed * (1 + speedMultiplier * 0.1);
-                if (bird.x < -40) bird.x = w + 40;
-                
-                bird.phase += 0.12;
-                let wingY = Math.sin(bird.phase) * 5;
-
-                ctx.beginPath();
-                ctx.moveTo(bird.x - 8, bird.y + wingY);
-                ctx.quadraticCurveTo(bird.x, bird.y - 3, bird.x + 8, bird.y + wingY);
-                ctx.moveTo(bird.x - 8, bird.y + wingY);
-                ctx.quadraticCurveTo(bird.x - 4, bird.y + 6, bird.x, bird.y + 2);
-                ctx.stroke();
-            });
-
-            // 3. שכבת הרים/גבעות רחוקות (Parallax 1 - נע לאט מאוד)
-            ctx.fillStyle = colors.groundFar;
-            ctx.globalAlpha = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(0, h);
-            for (let i = 0; i <= w; i += 30) {
-                let mountainY = h * 0.6 + Math.sin(i * 0.003 + globalOffset * 0.02) * 22;
-                ctx.lineTo(i, mountainY);
-            }
-            ctx.lineTo(w, h);
-            ctx.fill();
-            ctx.globalAlpha = 1.0;
-
-            // 4. מישורי סוואנה תיכוניים (Parallax 2 - קצב בינוני)
-            ctx.fillStyle = colors.groundFar;
-            ctx.fillRect(0, h * 0.68, w, h * 0.32);
-
-            // ציור צבאים חולפים ברקע (מעוגן לחוקי הגובה בצורה מושלמת)
-            gazelles.forEach((gazelle, idx) => {
-                gazelle.x -= gazelle.speed + speedMultiplier * 0.5;
-                gazelle.frame += 0.25;
-                let hopY = Math.abs(Math.sin(gazelle.frame)) * 14;
-
-                ctx.save();
-                ctx.translate(gazelle.x, (h * 0.76) - hopY);
-                ctx.fillStyle = isDarkMode ? '#1e110a' : '#b45309';
-                
-                ctx.beginPath();
-                ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI*2); // גוף
-                ctx.ellipse(8, -10, 4, 3, -0.4, 0, Math.PI*2); // ראש
-                ctx.fill();
-
-                // רגליים וצוואר
-                ctx.strokeStyle = isDarkMode ? '#1e110a' : '#b45309';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(4, 0); ctx.lineTo(8, -8); // צוואר
-                ctx.moveTo(-10, 0); ctx.lineTo(-14, 10); // רגל אחורית
-                ctx.moveTo(10, 0); ctx.lineTo(12, 10); // רגל קדמית
-                ctx.stroke();
-                ctx.restore();
-
-                // הסרה כשיוצא מהמסך
-                if (gazelle.x < -50) {
-                    gazelles.splice(idx, 1);
-                }
-            });
-
-            // ציור עצים שנעים במרחק
-            trees.forEach(tree => {
-                tree.x -= 0.5 * speedMultiplier;
-                if (tree.x < -150) {
-                    tree.x = w + 150;
-                    tree.yFactor = 0.66 + Math.random() * 0.06;
-                }
-                drawSafariAcacia(tree.x, h * tree.yFactor, tree.scale);
-            });
-
-            // 5. קדמת הבמה - אדמה קרובה (Parallax 3 - נע מהר)
-            ctx.fillStyle = colors.groundNear;
-            ctx.fillRect(0, h * 0.76, w, h * 0.24);
-
-            // ----------------- ציור האריה הפרוצדורלי במרכז -----------------
-            const lionX = w * 0.45;
-            const lionY = h * 0.74;
-
-            // עדכון נתוני תנועה של האריה
-            animationTime += 0.09 * speedMultiplier;
-            globalOffset += 1.2 * speedMultiplier;
-            currentDistance += (0.04 * speedMultiplier);
-            hudDistance.innerText = Math.floor(currentDistance) + ' מ\'';
-
-            ctx.save();
-            let bodyBob = Math.sin(animationTime * 2) * 3;
-            ctx.translate(lionX, lionY + bodyBob);
-
-            // צבעי האריה
-            let bodyColor = '#d97706';
-            let maneColor = '#78350f';
-            let shadowColor = '#451a03';
-
-            if (currentTimeOfDay === 'night') {
-                bodyColor = '#451a03';
-                maneColor = '#270c01';
-                shadowColor = '#1c0a01';
-            } else if (currentTimeOfDay === 'sunset') {
-                bodyColor = '#ea580c';
-                maneColor = '#9a3412';
-                shadowColor = '#431407';
-            } else if (currentTimeOfDay === 'morning') {
-                bodyColor = '#eab308';
-                maneColor = '#854d0e';
-                shadowColor = '#422006';
-            }
-
-            // צל קל מתחת לאריה
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-            ctx.beginPath();
-            ctx.ellipse(0, 32 - bodyBob, 45, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // --- מפרקי הרגליים ---
-            ctx.lineWidth = 7.5;
-            ctx.lineCap = 'round';
-
-            function drawProceduralLeg(startX, startY, isFront, phaseOffset, isFar) {
-                let phase = animationTime + phaseOffset;
-                let legLength = 32;
-                
-                let strideX = Math.sin(phase) * 14;
-                let strideY = Math.max(0, Math.cos(phase)) * 8;
-
-                let footX = startX + strideX;
-                let footY = startY + legLength - strideY;
-
-                let midX = (startX + footX) / 2 + (isFront ? 6 : -4);
-                let midY = (startY + footY) / 2 + 2;
-
-                ctx.strokeStyle = isFar ? shadowColor : bodyColor;
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(midX, midY);
-                ctx.lineTo(footX, footY);
-                ctx.stroke();
-
-                ctx.fillStyle = isFar ? shadowColor : bodyColor;
-                ctx.beginPath();
-                ctx.arc(footX, footY, 4.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // רגליים רחוקות
-            drawProceduralLeg(-22, 5, false, Math.PI, true);
-            drawProceduralLeg(18, 5, true, 0, true);
-
-            // זנב אריה
-            let tailAngle = Math.sin(animationTime) * 12;
-            ctx.strokeStyle = bodyColor;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(-32, -6);
-            ctx.quadraticCurveTo(-48, -12 + tailAngle, -52, 6 + tailAngle);
-            ctx.stroke();
-            
-            ctx.fillStyle = maneColor;
-            ctx.beginPath();
-            ctx.arc(-52, 6 + tailAngle, 5.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // גוף האריה
-            ctx.fillStyle = bodyColor;
-            ctx.beginPath();
-            ctx.roundRect(-32, -16, 56, 26, 8);
-            ctx.fill();
-
-            // רגליים קרובות
-            drawProceduralLeg(-18, 5, false, 0, false);
-            drawProceduralLeg(22, 5, true, Math.PI, false);
-
-            // רעמה מפוארת
-            ctx.fillStyle = maneColor;
-            ctx.beginPath();
-            ctx.arc(28, -14, 20, 0, Math.PI * 2);
-            ctx.arc(18, -20, 16, 0, Math.PI * 2);
-            ctx.arc(22, -4, 17, 0, Math.PI * 2);
-            ctx.fill();
-
-            // פני האריה
-            ctx.fillStyle = bodyColor;
-            ctx.beginPath();
-            ctx.roundRect(28, -20, 16, 12, 4);
-            ctx.fill();
-
-            // אוזניים
-            ctx.fillStyle = maneColor;
-            ctx.beginPath();
-            ctx.arc(20, -28, 5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = bodyColor;
-            ctx.beginPath();
-            ctx.arc(20, -28, 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            // עיניים
-            ctx.fillStyle = currentTimeOfDay === 'night' ? '#fbbf24' : '#1e293b';
-            ctx.beginPath();
-            ctx.arc(36, -17, 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // אף שחור קטן
-            ctx.fillStyle = '#000000';
-            ctx.beginPath();
-            ctx.moveTo(44, -16);
-            ctx.lineTo(44, -13);
-            ctx.lineTo(42, -14.5);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.restore();
-
-            // 6. עשבי בר בחזית התמונה (Parallax 4)
-            ctx.fillStyle = isDarkMode ? '#13112a' : '#854d0e';
-            for (let i = 0; i < w + 50; i += 40) {
-                let grassX = (i - (globalOffset * 1.6)) % (w + 50);
-                if (grassX < -30) grassX += w + 50;
-                
-                let windSway = Math.sin(animationTime * 0.8 + i) * 6;
-                ctx.beginPath();
-                ctx.moveTo(grassX, h);
-                ctx.quadraticCurveTo(grassX + 4, h - 25, grassX + 10 + windSway, h - 35);
-                ctx.quadraticCurveTo(grassX + 12, h - 15, grassX + 22, h);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            // 7. שכבת אפקטים של גשם
-            if (isRainy) {
-                ctx.strokeStyle = isDarkMode ? 'rgba(186, 230, 253, 0.22)' : 'rgba(15, 23, 42, 0.28)';
-                ctx.lineWidth = 1.2;
-                rainDrops.forEach(drop => {
-                    drop.y += drop.speed;
-                    drop.x -= 2.2; // רוח סופה
-                    
-                    if (drop.y > h) {
-                        drop.y = -20;
-                        drop.x = Math.random() * w;
-                    }
-
-                    ctx.beginPath();
-                    ctx.moveTo(drop.x, drop.y);
-                    ctx.lineTo(drop.x - 2.2, drop.y + drop.length);
-                    ctx.stroke();
-                });
-
-                // פלאש סערת ברקים רנדומלי
-                if (Math.random() < 0.003 && lightningFlash <= 0) {
-                    lightningFlash = 1.0;
-                    playThunderSound();
-                }
-            }
-
-            // החלת הבזק ברק (Lightning strike effect)
-            if (lightningFlash > 0.1) {
-                ctx.fillStyle = `rgba(255, 255, 255, ${lightningFlash})`;
-                ctx.fillRect(0, 0, w, h);
-                lightningFlash *= 0.82; // דעיכה מהירה של האור
-            }
-
-            // גחליליות זוהרות בלילה בלבד
-            if (currentTimeOfDay === 'night') {
-                fireflies.forEach(firefly => {
-                    firefly.angle += (Math.random() - 0.5) * 0.2;
-                    firefly.x += Math.cos(firefly.angle) * firefly.speed;
-                    firefly.y += Math.sin(firefly.angle) * firefly.speed;
-                    firefly.pulse += 0.05;
-
-                    if (firefly.x < 0 || firefly.x > w) firefly.x = Math.random() * w;
-                    if (firefly.y < 50 || firefly.y > h * 0.8) firefly.y = 100 + Math.random() * 200;
-
-                    let opacity = Math.abs(Math.sin(firefly.pulse));
-                    ctx.fillStyle = `rgba(163, 230, 53, ${opacity})`;
-                    ctx.shadowColor = '#a3e635';
-                    ctx.shadowBlur = 10;
-                    ctx.beginPath();
-                    ctx.arc(firefly.x, firefly.y, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                });
-            }
-
-            ctx.restore(); // שחזור רעידת מסך
-            
-            // המשך לולאת האנימציה
-            requestAnimationFrame(runSimulationLoop);
-        }
-
-        // הפעלה ראשונית של הסימולציה והקוד
-        runSimulationLoop();
-    </script>
+      </div>
+    </section>
+
+    <section class="glass rounded-2xl p-4 text-sm leading-7 text-slate-300 mb-4">
+      <h2 class="text-amber-400 font-black mb-1">מידע ספארי: האריה האפריקאי (Panthera leo)</h2>
+      <p>האריה הוא טורף־על חברתי החי בלהקות. בסימולטור אפשר לשנות מהירות, שעה ביום, מזג אוויר, להפעיל שאגה ולהוסיף איילות/צבאים שרצים ברקע.</p>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    const canvas = document.getElementById('simulationCanvas');
+    const ctx = canvas.getContext('2d');
+    const audioToggleBtn = document.getElementById('audioToggleBtn');
+    const audioIcon = document.getElementById('audioIcon');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValLabel = document.getElementById('speedValLabel');
+    const hudSpeed = document.getElementById('hudSpeed');
+    const hudDistance = document.getElementById('hudDistance');
+    const hudTime = document.getElementById('hudTime');
+    const hudWeather = document.getElementById('hudWeather');
+    const roarBtn = document.getElementById('roarBtn');
+    const weatherToggleBtn = document.getElementById('weatherToggleBtn');
+    const spawnGazelleBtn = document.getElementById('spawnGazelleBtn');
+    const canvasNotification = document.getElementById('canvasNotification');
+
+    let w = 0, h = 0, dpr = window.devicePixelRatio || 1;
+    let speedMultiplier = 1;
+    let currentDistance = 0;
+    let globalOffset = 0;
+    let animationTime = 0;
+    let currentTimeOfDay = 'noon';
+    let isRainy = false;
+    let audioEnabled = false;
+    let audioCtx = null;
+    let ambientWind = null;
+    let lightningFlash = 0;
+    let screenShake = 0;
+
+    const rainDrops = [];
+    const stars = [];
+    const gazelles = [];
+    const trees = [
+      { x: 120, yFactor: .68, scale: .95 },
+      { x: 460, yFactor: .70, scale: .78 },
+      { x: 790, yFactor: .67, scale: 1.1 },
+      { x: 1130, yFactor: .69, scale: .9 }
+    ];
+    const clouds = [
+      { x: 80, y: 50, size: 28, speed: .18 },
+      { x: 330, y: 85, size: 45, speed: .11 },
+      { x: 640, y: 40, size: 35, speed: .16 }
+    ];
+    const birds = Array.from({ length: 7 }, () => ({ x: Math.random() * 700 + 150, y: 45 + Math.random() * 110, phase: Math.random() * 6, speed: .8 + Math.random() * .7 }));
+    const fireflies = Array.from({ length: 24 }, () => ({ x: Math.random() * 900, y: 90 + Math.random() * 260, a: Math.random() * 6, s: .35 + Math.random() * .5, p: Math.random() * 6 }));
+
+    const skyColors = {
+      morning: { top:'#312e81', bottom:'#fdba74', sun:'#ffedd5', far:'#854d0e', near:'#a16207', label:'בוקר סוואנה 🌅' },
+      noon: { top:'#38bdf8', bottom:'#fef08a', sun:'#facc15', far:'#ca8a04', near:'#eab308', label:'צהריים בהירים ☀️' },
+      sunset: { top:'#7c2d12', bottom:'#fb923c', sun:'#fde047', far:'#7c2d12', near:'#9a3412', label:'שקיעה אדומה 🌇' },
+      night: { top:'#020617', bottom:'#0f172a', sun:'#f8fafc', far:'#1e1b4b', near:'#111827', label:'לילה אפריקאי 🌃' }
+    };
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      w = Math.max(1, rect.width);
+      h = Math.max(1, rect.height);
+      dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      rainDrops.length = 0;
+      for (let i = 0; i < 90; i++) rainDrops.push({ x: Math.random()*w, y: Math.random()*h, len: 10+Math.random()*16, speed: 6+Math.random()*5 });
+      stars.length = 0;
+      for (let i = 0; i < 70; i++) stars.push({ x: Math.random()*w, y: Math.random()*h*.48, r: .6+Math.random()*1.4, alpha: .25+Math.random()*.75 });
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function startAmbientSound() {
+      if (!audioEnabled || !audioCtx || ambientWind) return;
+      const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const source = audioCtx.createBufferSource();
+      const filter = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      filter.type = 'lowpass';
+      filter.frequency.value = isRainy ? 360 : 190;
+      gain.gain.value = isRainy ? .13 : .045;
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      source.start();
+      ambientWind = { source, filter, gain };
+    }
+
+    function stopAmbientSound() {
+      if (!ambientWind) return;
+      try { ambientWind.source.stop(); } catch (e) {}
+      ambientWind = null;
+    }
+
+    function playTone({ type='sawtooth', from=70, to=35, duration=1.5, gain=.25, filter=150 }) {
+      if (!audioEnabled || !audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const biquad = audioCtx.createBiquadFilter();
+      const g = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(from, now);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, to), now + duration);
+      biquad.type = 'lowpass';
+      biquad.frequency.value = filter;
+      g.gain.setValueAtTime(.001, now);
+      g.gain.linearRampToValueAtTime(gain, now + .08);
+      g.gain.exponentialRampToValueAtTime(.001, now + duration);
+      osc.connect(biquad);
+      biquad.connect(g);
+      g.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration + .05);
+    }
+
+    function playLionRoarSound() {
+      playTone({ type:'sawtooth', from:65, to:30, duration:1.8, gain:.34, filter:180 });
+      playTone({ type:'square', from:120, to:42, duration:1.25, gain:.12, filter:220 });
+    }
+
+    function playThunderSound() {
+      playTone({ type:'triangle', from:45, to:15, duration:2.6, gain:.42, filter:100 });
+    }
+
+    audioToggleBtn.addEventListener('click', async () => {
+      audioEnabled = !audioEnabled;
+      if (audioEnabled) {
+        initAudio();
+        audioIcon.textContent = '🔊';
+        audioToggleBtn.classList.add('active');
+        startAmbientSound();
+      } else {
+        audioIcon.textContent = '🔈';
+        audioToggleBtn.classList.remove('active');
+        stopAmbientSound();
+      }
+    });
+
+    speedSlider.addEventListener('input', e => {
+      speedMultiplier = parseFloat(e.target.value);
+      hudSpeed.textContent = speedMultiplier.toFixed(1) + 'x';
+      speedValLabel.textContent = speedMultiplier === 0 ? 'אריה במנוחה' : speedMultiplier < .8 ? 'הליכה איטית' : speedMultiplier <= 1.2 ? 'הליכה רגילה' : speedMultiplier <= 2.2 ? 'ריצה קלה' : 'מרדף מהיר!';
+    });
+
+    function setTimeOfDay(time) {
+      currentTimeOfDay = time;
+      document.querySelectorAll('.time-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.time === time));
+      hudTime.textContent = skyColors[time].label;
+    }
+    document.querySelectorAll('.time-btn').forEach(btn => btn.addEventListener('click', () => setTimeOfDay(btn.dataset.time)));
+
+    weatherToggleBtn.addEventListener('click', () => {
+      isRainy = !isRainy;
+      weatherToggleBtn.classList.toggle('active', isRainy);
+      hudWeather.textContent = isRainy ? 'סופת גשם 🌧️' : 'בהיר ☀️';
+      if (ambientWind) {
+        ambientWind.filter.frequency.setTargetAtTime(isRainy ? 360 : 190, audioCtx.currentTime, .4);
+        ambientWind.gain.gain.setTargetAtTime(isRainy ? .13 : .045, audioCtx.currentTime, .4);
+      }
+    });
+
+    function spawnGazelle() {
+      const amount = gazelles.length === 0 ? 2 : 1;
+      for (let i = 0; i < amount; i++) {
+        gazelles.push({ x: w + 60 + i*55, y: h * (.74 + Math.random()*.04), frame: Math.random()*6, speed: 2.8 + Math.random()*1.8, scale: .85 + Math.random()*.35 });
+      }
+      spawnGazelleBtn.classList.add('active');
+      setTimeout(() => spawnGazelleBtn.classList.remove('active'), 250);
+    }
+    spawnGazelleBtn.addEventListener('click', spawnGazelle);
+
+    function triggerRoar() {
+      if (!audioEnabled) audioToggleBtn.click();
+      screenShake = 14;
+      canvasNotification.style.opacity = '1';
+      canvasNotification.style.transform = 'translate(-50%, -50%) scale(1.08)';
+      playLionRoarSound();
+      setTimeout(() => {
+        canvasNotification.style.opacity = '0';
+        canvasNotification.style.transform = 'translate(-50%, -50%) scale(.75)';
+      }, 1100);
+    }
+    roarBtn.addEventListener('click', triggerRoar);
+    canvas.addEventListener('click', e => {
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      if (Math.hypot(x - w*.45, y - h*.74) < 115) triggerRoar();
+    });
+
+    function drawAcacia(x, y, s) {
+      ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+      ctx.fillStyle = currentTimeOfDay === 'night' ? '#130b06' : '#3c2211';
+      ctx.beginPath(); ctx.moveTo(-7,0); ctx.quadraticCurveTo(-5,-27,-22,-48); ctx.quadraticCurveTo(-35,-58,-48,-63); ctx.lineTo(-34,-58); ctx.quadraticCurveTo(-20,-48,-9,-35); ctx.quadraticCurveTo(6,-22,7,0); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-10,-26); ctx.quadraticCurveTo(17,-38,36,-58); ctx.lineTo(48,-57); ctx.quadraticCurveTo(20,-40,-5,-31); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = currentTimeOfDay === 'night' ? '#0a1f14' : '#1e4620';
+      [-42,0,38].forEach((cx, i) => { ctx.beginPath(); ctx.ellipse(cx, i===1?-82:-60, i===1?46:36, 9, 0, 0, Math.PI*2); ctx.fill(); });
+      ctx.restore();
+    }
+
+    function drawGazelle(g) {
+      g.x -= g.speed + speedMultiplier * .65;
+      g.frame += .22;
+      const hop = Math.abs(Math.sin(g.frame)) * 13;
+      ctx.save(); ctx.translate(g.x, g.y - hop); ctx.scale(g.scale, g.scale);
+      const c = currentTimeOfDay === 'night' ? '#3b210f' : '#b45309';
+      ctx.fillStyle = c; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.ellipse(0,0,18,8,0,0,Math.PI*2); ctx.ellipse(15,-10,6,4,-.4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(8,-3); ctx.lineTo(15,-10); ctx.moveTo(-11,6); ctx.lineTo(-17,22); ctx.moveTo(-4,7); ctx.lineTo(-1,22); ctx.moveTo(8,7); ctx.lineTo(14,22); ctx.moveTo(16,5); ctx.lineTo(19,21); ctx.moveTo(16,-14); ctx.lineTo(12,-24); ctx.moveTo(18,-14); ctx.lineTo(23,-23); ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawLion() {
+      const lionX = w * .45, lionY = h * .74;
+      animationTime += .09 * speedMultiplier;
+      const bob = Math.sin(animationTime*2) * 3;
+      ctx.save(); ctx.translate(lionX, lionY + bob);
+      let body = '#d97706', mane = '#78350f', shadow = '#451a03';
+      if (currentTimeOfDay === 'night') { body = '#451a03'; mane = '#270c01'; shadow = '#1c0a01'; }
+      if (currentTimeOfDay === 'sunset') { body = '#ea580c'; mane = '#9a3412'; shadow = '#431407'; }
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(0,32-bob,50,9,0,0,Math.PI*2); ctx.fill();
+      function leg(x, y, phase, far) {
+        const p = animationTime + phase;
+        const sx = Math.sin(p) * 14;
+        const sy = Math.max(0, Math.cos(p)) * 8;
+        const fx = x + sx, fy = y + 34 - sy;
+        ctx.strokeStyle = far ? shadow : body; ctx.lineWidth = 8; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo((x+fx)/2, (y+fy)/2+3); ctx.lineTo(fx,fy); ctx.stroke();
+        ctx.fillStyle = far ? shadow : body; ctx.beginPath(); ctx.arc(fx,fy,5,0,Math.PI*2); ctx.fill();
+      }
+      leg(-22,5,Math.PI,true); leg(18,5,0,true);
+      ctx.strokeStyle = body; ctx.lineWidth = 4; const tail = Math.sin(animationTime)*12; ctx.beginPath(); ctx.moveTo(-34,-6); ctx.quadraticCurveTo(-52,-14+tail,-58,8+tail); ctx.stroke(); ctx.fillStyle = mane; ctx.beginPath(); ctx.arc(-58,8+tail,6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = body; ctx.beginPath(); ctx.roundRect(-34,-17,60,28,9); ctx.fill();
+      leg(-18,5,0,false); leg(22,5,Math.PI,false);
+      ctx.fillStyle = mane; ctx.beginPath(); ctx.arc(28,-14,22,0,Math.PI*2); ctx.arc(18,-22,16,0,Math.PI*2); ctx.arc(22,-2,17,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = body; ctx.beginPath(); ctx.roundRect(29,-21,18,13,5); ctx.fill();
+      ctx.fillStyle = mane; ctx.beginPath(); ctx.arc(20,-30,5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = currentTimeOfDay === 'night' ? '#fbbf24' : '#111827'; ctx.beginPath(); ctx.arc(38,-17,2.2,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#020617'; ctx.beginPath(); ctx.moveTo(47,-16); ctx.lineTo(44,-13); ctx.lineTo(44,-18); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    function loop() {
+      ctx.save();
+      if (screenShake > .1) { ctx.translate((Math.random()-.5)*screenShake, (Math.random()-.5)*screenShake); screenShake *= .9; }
+      const c = skyColors[currentTimeOfDay];
+      const sky = ctx.createLinearGradient(0,0,0,h); sky.addColorStop(0,c.top); sky.addColorStop(1,c.bottom); ctx.fillStyle = sky; ctx.fillRect(0,0,w,h);
+      if (currentTimeOfDay === 'night') { ctx.fillStyle = '#fff'; stars.forEach(s => { ctx.globalAlpha = s.alpha; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); }); ctx.globalAlpha = 1; }
+      ctx.fillStyle = c.sun; ctx.shadowColor = c.sun; ctx.shadowBlur = currentTimeOfDay === 'sunset' ? 35 : 14; ctx.beginPath(); ctx.arc(w*.25,h*.28,currentTimeOfDay==='night'?18:28,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = currentTimeOfDay === 'night' ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.45)';
+      clouds.forEach(cl => { cl.x += cl.speed; if (cl.x > w+90) cl.x = -90; ctx.beginPath(); ctx.arc(cl.x,cl.y,cl.size,0,Math.PI*2); ctx.arc(cl.x+cl.size*.6,cl.y-8,cl.size*.75,0,Math.PI*2); ctx.arc(cl.x-cl.size*.6,cl.y+4,cl.size*.65,0,Math.PI*2); ctx.fill(); });
+      ctx.strokeStyle = currentTimeOfDay === 'night' ? 'rgba(255,255,255,.22)' : 'rgba(15,23,42,.45)'; ctx.lineWidth = 1.5;
+      birds.forEach(b => { b.x -= b.speed; if (b.x < -40) b.x = w+40; b.phase += .13; const wy = Math.sin(b.phase)*5; ctx.beginPath(); ctx.moveTo(b.x-8,b.y+wy); ctx.quadraticCurveTo(b.x,b.y-3,b.x+8,b.y+wy); ctx.stroke(); });
+      ctx.fillStyle = c.far; ctx.globalAlpha = .55; ctx.beginPath(); ctx.moveTo(0,h); for (let i=0;i<=w;i+=28) ctx.lineTo(i, h*.60 + Math.sin(i*.006 + globalOffset*.02)*22); ctx.lineTo(w,h); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = c.far; ctx.fillRect(0,h*.68,w,h*.32);
+      gazelles.forEach(drawGazelle); for (let i = gazelles.length - 1; i >= 0; i--) if (gazelles[i].x < -90) gazelles.splice(i, 1);
+      trees.forEach(t => { t.x -= .5 * speedMultiplier; if (t.x < -160) { t.x = w + 160; t.yFactor = .66 + Math.random()*.06; } drawAcacia(t.x, h*t.yFactor, t.scale); });
+      ctx.fillStyle = c.near; ctx.fillRect(0,h*.76,w,h*.24);
+      globalOffset += 1.15 * speedMultiplier;
+      currentDistance += .04 * speedMultiplier;
+      hudDistance.textContent = Math.floor(currentDistance) + " מ'";
+      drawLion();
+      ctx.fillStyle = currentTimeOfDay === 'night' ? '#13112a' : '#854d0e';
+      for (let i=0;i<w+60;i+=38) { let x=(i-globalOffset*1.6)%(w+60); if (x<-30) x+=w+60; const sway=Math.sin(animationTime*.8+i)*6; ctx.beginPath(); ctx.moveTo(x,h); ctx.quadraticCurveTo(x+4,h-25,x+10+sway,h-36); ctx.quadraticCurveTo(x+13,h-15,x+23,h); ctx.fill(); }
+      if (isRainy) {
+        ctx.strokeStyle = currentTimeOfDay === 'night' ? 'rgba(186,230,253,.24)' : 'rgba(15,23,42,.32)'; ctx.lineWidth = 1.3;
+        rainDrops.forEach(d => { d.y += d.speed; d.x -= 2.2; if (d.y > h) { d.y = -20; d.x = Math.random()*w; } ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-2.2,d.y+d.len); ctx.stroke(); });
+        if (Math.random() < .003 && lightningFlash <= 0) { lightningFlash = 1; playThunderSound(); }
+      }
+      if (lightningFlash > .08) { ctx.fillStyle = `rgba(255,255,255,${lightningFlash})`; ctx.fillRect(0,0,w,h); lightningFlash *= .82; }
+      if (currentTimeOfDay === 'night') {
+        fireflies.forEach(f => { f.a += (Math.random()-.5)*.22; f.x += Math.cos(f.a)*f.s; f.y += Math.sin(f.a)*f.s; f.p += .05; if (f.x<0||f.x>w) f.x = Math.random()*w; if (f.y<60||f.y>h*.82) f.y = 100+Math.random()*220; const op = Math.abs(Math.sin(f.p)); ctx.fillStyle = `rgba(163,230,53,${op})`; ctx.shadowColor = '#a3e635'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(f.x,f.y,2,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; });
+      }
+      ctx.restore();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
 </body>
 </html>
-
-```
-
