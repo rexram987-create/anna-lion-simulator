@@ -18,9 +18,9 @@
   <header class="w-full max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
     <div>
       <h1 class="text-2xl font-black text-amber-400">Savanna Pro Simulator</h1>
-      <p class="text-xs text-slate-400">סימולטור אריה אינטראקטיבי • Canvas + Web Audio</p>
+      <p class="text-xs text-slate-400">סימולטור אריה אינטראקטיבי • Canvas + Web Audio + שאגת MP3 אמיתית</p>
     </div>
-    <button id="audioToggleBtn" class="btn text-sm flex items-center gap-2"><span id="audioIcon">🔈</span><span>סאונד</span></button>
+    <button id="audioToggleBtn" class="btn text-sm flex items-center gap-2"><span id="audioIcon">🔈</span><span>סאונד רקע</span></button>
   </header>
 
   <main class="w-full max-w-5xl mx-auto px-3 flex-1 flex flex-col gap-3">
@@ -59,9 +59,20 @@
       </div>
     </section>
 
-    <section class="glass rounded-2xl p-4 text-sm leading-7 text-slate-300 mb-4">
-      <h2 class="text-amber-400 font-black mb-1">מידע ספארי: האריה האפריקאי (Panthera leo)</h2>
-      <p>האריה הוא טורף־על חברתי החי בלהקות. בסימולטור אפשר לשנות מהירות, שעה ביום, מזג אוויר, להפעיל שאגה ולהוסיף איילות/צבאים שרצים ברקע.</p>
+    <section class="glass rounded-2xl p-4 text-sm leading-7 text-slate-300 mb-4 border-r-4 border-r-amber-500">
+      <h2 class="text-amber-400 font-black mb-2">📖 מידע ספארי: האריה האפריקאי (Panthera leo)</h2>
+      <p>
+        האריה הוא אחד מטורפי־העל המפורסמים ביותר של יבשת אפריקה, וסמל עתיק של כוח, מלכות ואומץ. בניגוד לרוב בני משפחת החתוליים, האריות הם בעלי חיים חברתיים מאוד: הם חיים בלהקות הכוללות בדרך כלל נקבות קרובות משפחה, גוריהן, ולעיתים זכר שליט אחד או כמה זכרים השומרים על הטריטוריה. הנקבות הן לרוב הציידות העיקריות, ופועלות בשיתוף פעולה כדי לארוב לטרף כמו אנטילופות, זברות וגנו.
+      </p>
+      <p class="mt-2">
+        רעמת הזכר הבוגר משמשת גם כסימן חזותי מרשים וגם כאמצעי הרתעה מול יריבים. צבע הרעמה וגודלה יכולים להעיד על גיל, בריאות ועוצמה. שאגת האריה היא אחת הקריאות החזקות בטבע: היא יכולה להישמע למרחק של כמה קילומטרים, ומשמשת להכרזה על טריטוריה, תקשורת עם חברי הלהקה והרחקת מתחרים.
+      </p>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 font-mono text-[11px] text-slate-400 font-semibold">
+        <div>• מהירות מרבית: עד כ־80 קמ״ש</div>
+        <div>• משקל זכר בוגר: כ־150–250 ק״ג</div>
+        <div>• תוחלת חיים בטבע: כ־10–14 שנים</div>
+        <div>• סטטוס שימור: פגיע (Vulnerable)</div>
+      </div>
     </section>
   </main>
 
@@ -82,6 +93,10 @@
     const weatherToggleBtn = document.getElementById('weatherToggleBtn');
     const spawnGazelleBtn = document.getElementById('spawnGazelleBtn');
     const canvasNotification = document.getElementById('canvasNotification');
+
+    const lionRoarAudio = new Audio('assets/sounds/lion-roar.mp3');
+    lionRoarAudio.preload = 'auto';
+    lionRoarAudio.volume = 1;
 
     let w = 0, h = 0, dpr = window.devicePixelRatio || 1;
     let speedMultiplier = 1;
@@ -168,7 +183,7 @@
     }
 
     function playTone({ type='sawtooth', from=70, to=35, duration=1.5, gain=.25, filter=150 }) {
-      if (!audioEnabled || !audioCtx) return;
+      if (!audioCtx) return;
       const now = audioCtx.currentTime;
       const osc = audioCtx.createOscillator();
       const biquad = audioCtx.createBiquadFilter();
@@ -188,16 +203,32 @@
       osc.stop(now + duration + .05);
     }
 
-    function playLionRoarSound() {
+    function playLionRoarFallback() {
+      initAudio();
       playTone({ type:'sawtooth', from:65, to:30, duration:1.8, gain:.34, filter:180 });
       playTone({ type:'square', from:120, to:42, duration:1.25, gain:.12, filter:220 });
     }
 
+    function playLionRoarSound() {
+      try {
+        lionRoarAudio.pause();
+        lionRoarAudio.currentTime = 0;
+        const playPromise = lionRoarAudio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => playLionRoarFallback());
+        }
+      } catch (e) {
+        playLionRoarFallback();
+      }
+    }
+
     function playThunderSound() {
+      if (!audioEnabled) return;
+      initAudio();
       playTone({ type:'triangle', from:45, to:15, duration:2.6, gain:.42, filter:100 });
     }
 
-    audioToggleBtn.addEventListener('click', async () => {
+    audioToggleBtn.addEventListener('click', () => {
       audioEnabled = !audioEnabled;
       if (audioEnabled) {
         initAudio();
@@ -245,7 +276,6 @@
     spawnGazelleBtn.addEventListener('click', spawnGazelle);
 
     function triggerRoar() {
-      if (!audioEnabled) audioToggleBtn.click();
       screenShake = 14;
       canvasNotification.style.opacity = '1';
       canvasNotification.style.transform = 'translate(-50%, -50%) scale(1.08)';
